@@ -16,71 +16,144 @@ class FetchDependenciesTask extends DefaultTask {
 
     @TaskAction
     void fetchDependencies() {
-        println "fetching"
-        def gitConf = project.configurations.getByName(GitpackPlugin.GIT_CONFIGURATION)
-        def compileConf = project.configurations.getByName("compile")
+        def gitConf = project.configurations.getByName(GitpackPlugin.CONFIGURATION_GIT)
+        def compileConf = project.configurations.getByName(GitpackPlugin.CONFIGURATION_COMPILE)
 
         gitConf.getDependencies().each { dependency ->
             String path = getGitUriFromDependency(dependency)
-            File dir = new File(project.buildDir, dependency.name)
-            dir.mkdirs()
+            println "resolving from $path"
+            File projectRoot = new File(project.buildDir, dependency.name)
+            projectRoot.mkdirs()
 
-            Git git = openOrCreate(dir)
+            Git git = openOrCloneRepository(projectRoot, path)
 
-            //Check for pom
-            if (new File(dir, "pom.xml").exists()) {
-
-                //Build using maven
-                Shell.executeOnShell("mvn install -DskipTests", dir)
-
-                //find maven artifact
-                File artifact = getArtifactFromTarget(new File(dir, "target"))
-                if (artifact == null) {
-                    throw new BuildException("Could not find artifact.", null)
-                }
-
-                //Install into repo using dep name
-                /**
-                 * mvn install:install-file -Dfile=target/ALang-1.0-SNAPSHOT.jar -DgroupId=com.github.nishtahir -DartifactId=ALang -Dversion=-SNAPSHOT
-                 */
-                Shell.executeOnShell("mvn install:install-file -Dfile=${artifact.absolutePath} -DgroupId=${dependency.group}" +
-                        " -DartifactId=${dependency.name} -Dversion=${dependency.version} -Dpackaging=jar", artifact.parentFile)
-
-                //Add dependency to compile classpath
-
-            } else if (new File("${dir.absolutePath}/build.gradle").exists()) {
-
+            File artifact;
+            if (isMavenProject(projectRoot)) {
+                buildMavenProject(projectRoot)
+                artifact = getArtifactFromTarget(new File(projectRoot, "target"))
+            } else if (isGradleProject(projectRoot)) {
+                buildGradleProject(projectRoot)
+                artifact = getArtifactFromTarget(new File(projectRoot, "build/libs"))
+            } else {
+                throw new BuildException("Not a valid project maven or gradle project", null)
             }
-
+            installArtifactToRepository(artifact, dependency)
             compileConf.getDependencies().add(dependency)
         }
     }
 
-    static Git openOrCreate(File gitDirectory) throws IOException, GitAPIException {
-        Git git;
-        FileRepositoryBuilder repositoryBuilder = new FileRepositoryBuilder();
-        repositoryBuilder.addCeilingDirectory(gitDirectory);
-        repositoryBuilder.findGitDir(gitDirectory);
-        if (repositoryBuilder.getGitDir() == null) {
-            git = Git.init().setDirectory(gitDirectory.getParentFile()).call();
-        } else {
-            git = new Git(repositoryBuilder.build());
+    def buildGradleProject(File file) {
+        use(Shell) {
+            if (0 != "gradle assemble".executeOnShell(file)) {
+                throw new BuildException("Failed to build the project", null)
+            }
         }
-        return git;
     }
 
+    /**
+     *
+     * @param file
+     * @return
+     */
+    def buildMavenProject(File file) {
+        use(Shell) {
+            if (0 != "mvn install -DskipTests".executeOnShell(file)) {
+                throw new BuildException("Failed to build the project", null)
+            }
+        }
+    }
+
+    /**
+     * Installs the jar into the local maven repository.
+     * @param artifact jar to install.
+     * @param dependency
+     * @return
+     */
+    def installArtifactToRepository(File artifact, Dependency dependency) {
+        use(Shell) {
+            if (0 != ("mvn install:install-file" +
+                    " -Dfile=${artifact.absolutePath}" +
+                    " -DgroupId=${dependency.group}" +
+                    " -DartifactId=${dependency.name}" +
+                    " -Dversion=${dependency.version}" +
+                    " -Dpackaging=jar")
+                    .executeOnShell(artifact.parentFile)
+            ) {
+                throw new BuildException("Failed to install artifact into repository", null)
+            }
+        }
+    }
+
+    /**
+     *
+     * @param pathToRepository
+     * @return
+     * @throws IOException
+     * @throws GitAPIException
+     */
+    static Git openOrCloneRepository(File directory, String pathToRepository) {
+
+        try {
+            Git git;
+            FileRepositoryBuilder repositoryBuilder = new FileRepositoryBuilder();
+            repositoryBuilder.addCeilingDirectory(directory);
+            repositoryBuilder.findGitDir(directory);
+            if (repositoryBuilder.getGitDir() == null) {
+                directory.delete()
+                git = Git.cloneRepository().setURI(pathToRepository).setDirectory(directory).call();
+            } else {
+                git = new Git(repositoryBuilder.build());
+                git.pull().call()
+            }
+            return git;
+        } catch (IOException | GitAPIException e) {
+            throw new BuildException("Failed to clone or access the repository", e)
+        }
+    }
+
+    /**
+     *
+     * @param file
+     * @return
+     */
     static File getArtifactFromTarget(File file) {
         //Need a better way to find the artifact
         File art = null;
         file.eachFileMatch(FileType.FILES, ~/.*.jar/) {
             art = it
         }
+        if (art == null) {
+            throw new BuildException("Couldn't find artifact", null)
+        }
         return art
     }
 
-
+    /**
+     * Converts
+     *
+     * @param dependency
+     * @return
+     */
     static String getGitUriFromDependency(Dependency dependency) {
         def values = dependency.group.split("\\.")
         return "https://${values[1]}.${values[0]}/${values[2]}/${dependency.name}.git"
+    }
+
+    /**
+     * Checks if pom.xml exists
+     * @param projectRoot Root directory of the project
+     * @return true if it's a maven project
+     */
+    static boolean isMavenProject(File projectRoot) {
+        return new File(projectRoot, "pom.xml").exists()
+    }
+
+    /**
+     * Checks if it's a gradle project by looking for the gradle build script
+     * @param projectRoot Root directory of the project
+     * @return true if it's a gradle project
+     */
+    static boolean isGradleProject(File projectRoot) {
+        return new File(projectRoot, "build.gradle").exists()
     }
 }

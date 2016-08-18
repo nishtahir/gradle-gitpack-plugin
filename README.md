@@ -3,6 +3,14 @@
 Inspired by Jitpack.io, this plugin allows you to add public github or gitlab repositories
 as dependencies directly to your java projects.
 
+# Requirements
+
+The following requirements have to be installed and added to your system path.
+
+* Maven
+
+* Gradle
+
 # Usage
 
 Add the plugin to your buildscript
