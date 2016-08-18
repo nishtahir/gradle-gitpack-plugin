@@ -8,6 +8,9 @@ import org.gradle.api.DefaultTask
 import org.gradle.api.artifacts.Dependency
 import org.gradle.api.tasks.TaskAction
 import org.gradle.tooling.BuildException
+import org.gradle.tooling.BuildLauncher
+import org.gradle.tooling.GradleConnector
+import org.gradle.tooling.ProjectConnection
 
 /**
  *
@@ -26,7 +29,7 @@ class FetchDependenciesTask extends DefaultTask {
             projectRoot.mkdirs()
 
             Git git = openOrCloneRepository(projectRoot, path)
-
+            git.close()
             File artifact;
             if (isMavenProject(projectRoot)) {
                 buildMavenProject(projectRoot)
@@ -42,11 +45,25 @@ class FetchDependenciesTask extends DefaultTask {
         }
     }
 
-    def buildGradleProject(File file) {
-        use(Shell) {
-            if (0 != "gradle assemble".executeOnShell(file)) {
-                throw new BuildException("Failed to build the project", null)
-            }
+    /**
+     * Run gradle build
+     * @param file root directory of the project
+     * @return
+     */
+    static def buildGradleProject(File file) {
+        ProjectConnection connection = GradleConnector.newConnector()
+                .forProjectDirectory(file)
+                .connect()
+        try {
+            BuildLauncher build = connection.newBuild()
+            build.forTasks("assemble")
+            build.standardOutput = System.out
+            build.standardError = System.err
+            build.run()
+        } catch (Exception e) {
+            throw new BuildException("Failed to build the project", e)
+        } finally {
+            connection.close()
         }
     }
 
@@ -55,7 +72,7 @@ class FetchDependenciesTask extends DefaultTask {
      * @param file
      * @return
      */
-    def buildMavenProject(File file) {
+    static def buildMavenProject(File file) {
         use(Shell) {
             if (0 != "mvn install -DskipTests".executeOnShell(file)) {
                 throw new BuildException("Failed to build the project", null)
@@ -69,7 +86,7 @@ class FetchDependenciesTask extends DefaultTask {
      * @param dependency
      * @return
      */
-    def installArtifactToRepository(File artifact, Dependency dependency) {
+    static def installArtifactToRepository(File artifact, Dependency dependency) {
         use(Shell) {
             if (0 != ("mvn install:install-file" +
                     " -Dfile=${artifact.absolutePath}" +

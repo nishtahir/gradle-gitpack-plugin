@@ -27,7 +27,7 @@ class Shell {
     }
 
     /**
-     *
+     * Append prefix to shell
      * @param command
      * @return
      */
