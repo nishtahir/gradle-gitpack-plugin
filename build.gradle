@@ -1,0 +1,14 @@
+group 'com.nishtahir'
+version '1.0-SNAPSHOT'
+
+apply plugin: 'groovy'
+apply plugin: 'maven'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    compile 'org.eclipse.jgit:org.eclipse.jgit:4.4.1.201607150455-r'
+    compile gradleApi()
+}
