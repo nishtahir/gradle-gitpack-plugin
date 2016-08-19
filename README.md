@@ -3,14 +3,6 @@
 Inspired by Jitpack.io, this plugin allows you to add public github or gitlab repositories
 as dependencies directly to your java projects.
 
-# Requirements
-
-The following requirements have to be installed and added to your system path.
-
-* Maven
-
-* Gradle
-
 # Usage
 
 Add the plugin to your buildscript
@@ -23,7 +15,7 @@ buildscript {
     }
 
     dependencies {
-       classpath 'com.nishtahir:gradle-gitlib-plugin:1.0-SNAPSHOT'
+       classpath 'com.nishtahir:gradle-gitpack-plugin:1.0-SNAPSHOT'
     }
 }
 ```
@@ -31,7 +23,7 @@ buildscript {
 And apply the plugin to your build
 
 ```
-apply plugin: 'com.nishtahir.gradle-gitlib-plugin'
+apply plugin: 'com.nishtahir.gradle-gitpack-plugin'
 ```
 
 Declare compile time dependencies using `git`
