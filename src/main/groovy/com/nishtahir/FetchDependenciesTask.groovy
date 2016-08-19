@@ -1,6 +1,7 @@
 package com.nishtahir
 
 import groovy.io.FileType
+import org.apache.maven.cli.MavenCli
 import org.eclipse.jgit.api.Git
 import org.eclipse.jgit.api.errors.GitAPIException
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder
@@ -40,7 +41,7 @@ class FetchDependenciesTask extends DefaultTask {
             } else {
                 throw new BuildException("Not a valid project maven or gradle project", null)
             }
-            installArtifactToRepository(artifact, dependency)
+            installArtifactToRepository(artifact, projectRoot, dependency)
             compileConf.getDependencies().add(dependency)
         }
     }
@@ -69,14 +70,19 @@ class FetchDependenciesTask extends DefaultTask {
 
     /**
      *
-     * @param file
+     * @param projectRoot
      * @return
      */
-    static def buildMavenProject(File file) {
-        use(Shell) {
-            if (0 != "mvn install -DskipTests".executeOnShell(file)) {
-                throw new BuildException("Failed to build the project", null)
-            }
+    static def buildMavenProject(File projectRoot) {
+        MavenCli mavenCli = new MavenCli()
+        System.setProperty("maven.multiModuleProjectDirectory", projectRoot.absolutePath)
+        String[] params = ["-Dmaven.test.skip=true",
+                           "install"].toArray()
+
+        prettyPrintCommand "maven", params
+
+        if (0 != mavenCli.doMain(params, projectRoot.absolutePath, System.out, System.err)) {
+            throw new BuildException("Failed to build and install.", null)
         }
     }
 
@@ -86,18 +92,18 @@ class FetchDependenciesTask extends DefaultTask {
      * @param dependency
      * @return
      */
-    static def installArtifactToRepository(File artifact, Dependency dependency) {
-        use(Shell) {
-            if (0 != ("mvn install:install-file" +
-                    " -Dfile=${artifact.absolutePath}" +
-                    " -DgroupId=${dependency.group}" +
-                    " -DartifactId=${dependency.name}" +
-                    " -Dversion=${dependency.version}" +
-                    " -Dpackaging=jar")
-                    .executeOnShell(artifact.parentFile)
-            ) {
-                throw new BuildException("Failed to install artifact into repository", null)
-            }
+    static def installArtifactToRepository(File artifact, File projectRoot, Dependency dependency) {
+        MavenCli mavenCli = new MavenCli()
+        String[] params = ["install:install-file", "-Dfile=${artifact.absolutePath}",
+                           "-DgroupId=${dependency.group}",
+                           "-DartifactId=${dependency.name}",
+                           "-Dversion=${dependency.version}",
+                           "-Dpackaging=jar"].toArray()
+
+        prettyPrintCommand "maven", params
+
+        if (0 != mavenCli.doMain(params, projectRoot.absolutePath, System.out, System.err)) {
+            throw new BuildException("Failed to install artifact into repository", null)
         }
     }
 
@@ -172,5 +178,9 @@ class FetchDependenciesTask extends DefaultTask {
      */
     static boolean isGradleProject(File projectRoot) {
         return new File(projectRoot, "build.gradle").exists()
+    }
+
+    static void prettyPrintCommand(String executor, String[] params) {
+        println "executing $executor task" + params.join(" ")
     }
 }

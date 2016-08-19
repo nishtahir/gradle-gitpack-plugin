@@ -9,6 +9,7 @@ repositories {
 }
 
 dependencies {
-    compile 'org.eclipse.jgit:org.eclipse.jgit:4.4.1.201607150455-r'
+    compile group: 'org.apache.maven', name: 'maven-embedder', version: '3.3.9'
+    compile group: 'org.eclipse.jgit', name: 'org.eclipse.jgit', version: '4.4.1.201607150455-r'
     compile gradleApi()
 }
