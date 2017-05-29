@@ -2,6 +2,7 @@ package com.nishtahir
 
 import org.gradle.api.Project
 import org.gradle.api.artifacts.ConfigurationContainer
+import org.gradle.api.artifacts.Dependency
 import org.gradle.api.artifacts.dsl.RepositoryHandler
 import org.gradle.api.plugins.ExtensionContainer
 import org.gradle.api.tasks.TaskContainer
@@ -27,4 +28,8 @@ internal inline operator fun TaskContainer.invoke(function: TaskContainer.() -> 
     function(); return this
 }
 
+fun Dependency.toGitRepoUri(): String {
+    val values = group.split(".")
+    return "https://${values[1]}.${values[0]}/${values[2]}/$name.git"
+}
 

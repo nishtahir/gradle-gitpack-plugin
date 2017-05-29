@@ -30,13 +30,18 @@ open class GitpackPluginTest {
                 id 'java'
             }
 
+            repositories {
+                mavenCentral()
+            }
+
             dependencies {
-                git 'com.github.nishtahir:ALang:SNAPSHOT'
+                git 'com.github.nishtahir:ALang:master'
             }""".trimIndent())
 
         val result: BuildResult = GradleRunner.create()
                 .withProjectDir(testProjectDir.root)
                 .withPluginClasspath()
+                .withArguments("fetch")
                 .build()
 
         println(result.output)

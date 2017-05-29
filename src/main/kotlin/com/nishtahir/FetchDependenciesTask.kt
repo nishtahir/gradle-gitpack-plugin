@@ -21,7 +21,7 @@ open class FetchDependenciesTask : DefaultTask() {
 
         gitConfiguration.dependencies.forEach { dependency ->
             val dependentProjectRoot = File(project.buildDir, dependency.name).apply { mkdirs() }
-            openOrCloneRepository(dependentProjectRoot, getGitUriFromDependency(dependency))
+            openOrCloneRepository(dependentProjectRoot, dependency.toGitRepoUri())
             val artifact = if (isMavenProject(dependentProjectRoot)) {
                 buildMavenProject(dependentProjectRoot)
                 getArtifactFromTarget(File(dependentProjectRoot, "target"))
@@ -56,7 +56,7 @@ open class FetchDependenciesTask : DefaultTask() {
     fun buildMavenProject(dependentProjectRoot: File) {
         val mavenCli = MavenCli()
         System.setProperty("maven.multiModuleProjectDirectory", dependentProjectRoot.absolutePath)
-        val params = listOf("-Dmaven.test.skip=true", "install")
+        val params = listOf("-Dmaven.test.skip=true", "package")
 
         prettyPrintCommand("maven", params)
 
@@ -72,7 +72,7 @@ open class FetchDependenciesTask : DefaultTask() {
                 "-DartifactId=${dependency.name}",
                 "-Dversion=${dependency.version}",
                 "-Dpackaging=jar",
-                "-D-DlocalRepositoryPath=$localMavenRepository")
+                "-DlocalRepositoryPath=$localMavenRepository")
 
         prettyPrintCommand("maven", params)
 
@@ -88,9 +88,11 @@ open class FetchDependenciesTask : DefaultTask() {
                 findGitDir(directory)
             }
             val git = if (repositoryBuilder.gitDir == null) {
+                println("Cloning into: $pathToRepository")
                 directory.delete()
                 Git.cloneRepository().setURI(pathToRepository).setDirectory(directory).call()
             } else {
+                println("Pulling from: $pathToRepository")
                 Git(repositoryBuilder.build()).apply {
                     pull().call()
                 }
@@ -106,11 +108,6 @@ open class FetchDependenciesTask : DefaultTask() {
             it.extension == "jar"
         }
         return requireNotNull(artifact) { "Could not find artifact." }
-    }
-
-    fun getGitUriFromDependency(dependency: Dependency): String {
-        val values = dependency.group.split("\\.")
-        return "https://${values[1]}.${values[0]}/${values[2]}/${dependency.name}.git"
     }
 
     fun isMavenProject(projectRoot: File): Boolean {
