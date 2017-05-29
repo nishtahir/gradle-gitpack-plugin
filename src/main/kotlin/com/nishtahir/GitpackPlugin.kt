@@ -28,7 +28,7 @@ class GitpackPlugin : Plugin<Project> {
             tasks {
                 val fetchTask = create(TASK_FETCH, FetchDependenciesTask::class.java)
                 if (hasCompatibleJvmPlugin()) {
-                    getByName("compileJava").dependsOn(fetchTask)
+                    getByName(TASK_COMPILE_JAVA).dependsOn(fetchTask)
                 } else {
                     throw BuildException("The project isn't a compatible JVM project.")
                 }
