@@ -46,8 +46,6 @@ fun Project.hasCompatibleJvmPlugin(): Boolean {
     return isJavaProject() || isGroovyProject() || isKotlinProject()
 }
 
-open class GitpackPluginExtension {
-
-}
+open class GitpackPluginExtension
 
 

@@ -32,4 +32,3 @@ fun Dependency.toGitRepoUri(): String {
     val values = group.split(".")
     return "https://${values[1]}.${values[0]}/${values[2]}/$name.git"
 }
-
